@@ -3,36 +3,24 @@ import email
 import pdfplumber
 import os
 import re
-import datetime
 import openpyxl
 from openpyxl.styles import Font
+from datetime import datetime
 
+from gpt4all import GPT4All
+model_path = r"C:\Users\nhabt\OneDrive\PycharmProjects\invoice-automation\Phi-3-mini-4k-instruct-q4.gguf"
+ki = GPT4All(model_path)
 
-def extract_invoice_data(text):
-    """
-    Extrahiert Rechnungsdaten aus dem Text (Datum, Nummer, Firma/Händler, Beträge).
-    """
-    datum_match = re.search(r'Datum[:\s]*([0-9]{2}\.[0-9]{2}\.[0-9]{4})', text)
-    rechnungsnr_match = re.search(r'Rechnungsnummer[:\s]*(\S+)', text)
-    firma_match = re.search(r'(?:Firma|Unternehmen|Verkäufer|Händler)[:\s]*(.+?)\n', text)
-    zwischensumme_match = re.search(r'Zwischensumme[:\s]*([\d.,]+)', text)
-    gesamtbetrag_match = re.search(r'(?:Gesamtbetrag)[:\s]*([\d.,]+)', text)
-
-    if not datum_match:
-        return None  # Kein gültiger Datensatz gefunden
-
-    try:
-        datum = datetime.datetime.strptime(datum_match.group(1), "%d.%m.%Y")
-    except ValueError:
-        return None
-
-    return {
-        "Datum": datum,
-        "Rechnungsnummer": rechnungsnr_match.group(1) if rechnungsnr_match else '',
-        "Firma": firma_match.group(1).strip() if firma_match else 'Unbekannt',
-        "Zwischensumme": zwischensumme_match.group(1) if zwischensumme_match else '',
-        "Gesamtbetrag": gesamtbetrag_match.group(1) if gesamtbetrag_match else ''
-    }
+def search_email(uid_max, criteria):
+    """Erstellt Suchstrings für mehrere Absender."""
+    search_strings = []
+    for criteria_dict in criteria:
+        search_parts = []
+        for key, value in criteria_dict.items():
+            search_parts.append(f'{key} "{value}"')
+        search_parts.append(f'UID {uid_max + 1}:*')
+        search_strings.append(f'({" ".join(search_parts)})')
+    return search_strings
 
 
 def create_excel_table(alle_rechnungen, excel_file="rechnungen.xlsx"):
@@ -100,16 +88,44 @@ def create_excel_table(alle_rechnungen, excel_file="rechnungen.xlsx"):
     print(f"Excel-Tabelle gespeichert: {excel_file}")
 
 
-def search_email(uid_max, criteria):
-    """Erstellt Suchstrings für mehrere Absender."""
-    search_strings = []
-    for criteria_dict in criteria:
-        search_parts = []
-        for key, value in criteria_dict.items():
-            search_parts.append(f'{key} "{value}"')
-        search_parts.append(f'UID {uid_max + 1}:*')
-        search_strings.append(f'({" ".join(search_parts)})')
-    return search_strings
+
+def extract_invoice_data_ki(text):
+    prompt = f"""
+       Extrahiere die folgenden Rechnungsdaten aus dem Text im EXAKT angegebenen Format. Gib NUR die Daten aus, ohne jegliche zusätzliche Erklärungen, Beispiele, Überschriften oder Kommentare. Wenn ein Wert nicht gefunden wird, lasse das Feld leer.
+
+       Format:
+       Datum: TT.MM.JJJJ
+       Rechnungsnummer: <Zeichenkette ohne Leerzeichen>
+       Firma: <Zeichenkette>
+       Zwischensumme: <Zahl mit 2 Nachkommastellen, Punkt als Dezimaltrennzeichen>
+       Gesamtsumme: <Zahl mit 2 Nachkommastellen, Punkt als Dezimaltrennzeichen>
+
+       Text:
+       {text[:4000]}
+       """
+    antwort = ki.generate(prompt=prompt, max_tokens=300, temp=0.1, streaming=False)
+    print("Antwort der KI:\n", antwort)
+
+    # Antwort parsen mit Regex
+    try:
+        datum_match = re.search(r"Datum:\s*(\d{2}\.\d{2}\.\d{4})", antwort)
+        rechnungsnr_match = re.search(r"Rechnungsnummer:\s*(\S*)", antwort)
+        firma_match = re.search(r"Firma:\s*(.+)", antwort)
+        zwischensumme_match = re.search(r"Zwischensumme:\s*([\d\.]+)", antwort)
+        gesamtsumme_match = re.search(r"Gesamtsumme:\s*([\d\.]+)", antwort)
+
+        rechnung = {
+            "Datum": datetime.strptime(datum_match.group(1), "%d.%m.%Y") if datum_match else None,
+            "Rechnungsnummer": rechnungsnr_match.group(1) if rechnungsnr_match else "",
+            "Firma": firma_match.group(1).strip() if firma_match else "",
+            "Zwischensumme": float(zwischensumme_match.group(1)) if zwischensumme_match else 0.0,
+            "Gesamtbetrag": float(gesamtsumme_match.group(1)) if gesamtsumme_match else 0.0
+        }
+        return rechnung
+
+    except Exception as e:
+        print("Fehler beim Parsen der KI-Antwort:", e)
+        return None
 
 
 def process_attachment(part, save_dir="anhänge"):
@@ -148,7 +164,7 @@ def process_attachment(part, save_dir="anhänge"):
                 return None
 
             # Rechnungsdaten extrahieren
-            rechnung = extract_invoice_data(text)
+            rechnung = extract_invoice_data_ki(text)
             if rechnung:
                 alle_rechnungen.append(rechnung)
                 print(f"Rechnungsdaten extrahiert: {rechnung}")
@@ -157,6 +173,7 @@ def process_attachment(part, save_dir="anhänge"):
         except Exception as e:
             print(f"Fehler beim Lesen der Datei {dateiname}: {e}")
             return None
+
 
 
 # Verbindungseinstellungen
@@ -217,3 +234,5 @@ else:
 # Verbindung schließen
 mail.logout()
 print("Verbindung geschlossen")
+
+

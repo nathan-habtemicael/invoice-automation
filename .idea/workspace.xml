@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="dcd62f23-d9eb-48a6-a598-bbce5979f823" name="Changes" comment="First draft of invoice automation script">
+    <list default="true" id="dcd62f23-d9eb-48a6-a598-bbce5979f823" name="Changes" comment="Refactor invoice data extraction to use AI model (GPT4All) for improved accuracy">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,18 +36,18 @@
     </excluded-from-favorite>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "nathan-habtemicael"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;nathan-habtemicael&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/nathan-habtemicael/invoice-automation.git",
-    "accountId": "7a73cc14-e244-4893-b157-6952558c0b65"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/nathan-habtemicael/invoice-automation.git&quot;,
+    &quot;accountId&quot;: &quot;7a73cc14-e244-4893-b157-6952558c0b65&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
 }</component>
@@ -62,7 +63,7 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;configurable.group.editor&quot;
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.keymap&quot;
   }
 }</component>
   <component name="SharedIndexes">
@@ -120,6 +121,8 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="First draft of invoice automation script" />
-    <option name="LAST_COMMIT_MESSAGE" value="First draft of invoice automation script" />
+    <MESSAGE value="Save current changes" />
+    <MESSAGE value="Refactor invoice data extraction to use AI model (GPT4All) for improved accuracy" />
+    <option name="LAST_COMMIT_MESSAGE" value="Refactor invoice data extraction to use AI model (GPT4All) for improved accuracy" />
   </component>
 </project>
