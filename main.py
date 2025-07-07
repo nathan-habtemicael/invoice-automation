@@ -23,69 +23,65 @@ def search_email(uid_max, criteria):
     return search_strings
 
 
-def create_excel_table(alle_rechnungen, excel_file="rechnungen.xlsx"):
-    """
-    Erstellt eine Excel-Tabelle mit Rechnungen, gruppiert nach Jahr und Monat.
-    """
+from openpyxl.styles import Font, PatternFill, Border, Side
+
+def create_excel_table(alle_rechnungen, excel_file="Invoices.xlsx"):
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Rechnungen"
+    ws.title = "Invoices"
 
-    # Kopfzeile
-    headers = ["Datum", "Rechnungsnummer", "Firma", "Zwischensumme", "Gesamtbetrag"]
-    ws.append(headers)
-    for col in ws[1]:
-        col.font = Font(bold=True)
+    # Überschriften
+    ws.cell(row=1, column=1, value="Datum")
+    ws.cell(row=1, column=2, value="Firma")
+    ws.cell(row=1, column=3, value="Rechnungsnummer")
+    ws.cell(row=1, column=4, value="Zwischensumme")
+    ws.cell(row=1, column=5, value="Gesamtsumme")
 
-    # Rechnungen nach Jahr und Monat sortieren
-    alle_rechnungen.sort(key=lambda x: x["Datum"])
+    # Spaltenbreite definieren
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 17
+    ws.column_dimensions['E'].width = 17
 
-    current_year = None
-    current_month = None
-    row = 2  # Start nach der Kopfzeile
+    # Daten eintragen mit Euro hinten
+    for row_num, rechnung in enumerate(alle_rechnungen, start=2):
+        ws.cell(row=row_num, column=1,
+                value=rechnung.get("Datum").strftime("%d.%m.%Y") if rechnung.get("Datum") else "")
+        ws.cell(row=row_num, column=2, value=rechnung.get("Firma", ""))
+        ws.cell(row=row_num, column=3, value=rechnung.get("Rechnungsnummer", ""))
 
-    for rechnung in alle_rechnungen:
-        year = rechnung["Datum"].year
-        month = rechnung["Datum"].month
+        zelle_zwischensumme = ws.cell(row=row_num, column=4, value=rechnung.get("Zwischensumme", 0.0))
+        zelle_zwischensumme.number_format = '#,##0.00 "€"'
 
-        # 4 Zeilen Abstand bei neuem Jahr
-        if current_year != year:
-            if current_year is not None:
-                row += 4
-            current_year = year
-            current_month = None
+        zelle_gesamtsumme = ws.cell(row=row_num, column=5, value=rechnung.get("Gesamtbetrag", 0.0))
+        zelle_gesamtsumme.number_format = '#,##0.00 "€"'
 
-        # 2 Zeilen Abstand bei neuem Monat
-        if current_month != month:
-            if current_month is not None:
-                row += 2
-            current_month = month
+    # Überschriften formatieren (fett + hellgrün)
+    fill_color = PatternFill(fill_type="solid", fgColor="8EE53F")
+    for col in range(1, 6):
+        cell = ws.cell(row=1, column=col)
+        cell.font = Font(bold=True, size=12)
+        cell.fill = fill_color
 
-        # Rechnungsdaten einfügen
-        ws.append([
-            rechnung["Datum"].strftime("%d.%m.%Y"),
-            rechnung["Rechnungsnummer"],
-            rechnung["Firma"],
-            rechnung["Zwischensumme"],
-            rechnung["Gesamtbetrag"]
-        ])
-        row += 1
+    # Dünner Rahmen innen und außen
+    dünne_linien = Side(border_style="thin", color="000000")
+    max_row = ws.max_row
+    max_col = 5
 
-    # Spaltenbreite anpassen
-    for col in ws.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = max_length + 2
-        ws.column_dimensions[column].width = adjusted_width
+    for row in range(1, max_row + 1):
+        for col in range(1, max_col + 1):
+            cell = ws.cell(row=row, column=col)
+            cell.border = Border(
+                left=dünne_linien,
+                right=dünne_linien,
+                top=dünne_linien,
+                bottom=dünne_linien
+            )
 
     wb.save(excel_file)
-    print(f"Excel-Tabelle gespeichert: {excel_file}")
+    print(f"Excel-Datei '{excel_file}' wurde gespeichert.")
+
 
 
 
