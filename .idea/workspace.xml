@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="dcd62f23-d9eb-48a6-a598-bbce5979f823" name="Changes" comment="Refactor invoice data extraction to use AI model (GPT4All) for improved accuracy">
+    <list default="true" id="dcd62f23-d9eb-48a6-a598-bbce5979f823" name="Changes" comment="Enhanced visual styling in create_excel_table">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
@@ -90,7 +90,31 @@
       <option name="project" value="LOCAL" />
       <updated>1751128885957</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Refactor invoice data extraction to use AI model (GPT4All) for improved accuracy">
+      <option name="closed" value="true" />
+      <created>1751391452816</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1751391452816</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Enhanced visual styling in create_excel_table">
+      <option name="closed" value="true" />
+      <created>1751911176303</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1751911176303</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Enhanced visual styling in create_excel_table">
+      <option name="closed" value="true" />
+      <created>1751911743184</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1751911743184</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -123,6 +147,7 @@
     <MESSAGE value="First draft of invoice automation script" />
     <MESSAGE value="Save current changes" />
     <MESSAGE value="Refactor invoice data extraction to use AI model (GPT4All) for improved accuracy" />
-    <option name="LAST_COMMIT_MESSAGE" value="Refactor invoice data extraction to use AI model (GPT4All) for improved accuracy" />
+    <MESSAGE value="Enhanced visual styling in create_excel_table" />
+    <option name="LAST_COMMIT_MESSAGE" value="Enhanced visual styling in create_excel_table" />
   </component>
 </project>
