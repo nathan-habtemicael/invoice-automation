@@ -9,9 +9,14 @@ from datetime import datetime
 from openpyxl.styles import Font, PatternFill, Border, Side
 from gpt4all import GPT4All
 
-# GPT4All-Modell laden
+        # Anzahl logischer Kerne herausfinden
+num_threads = os.cpu_count()
+print("Logische Kerne (inkl. Hyperthreading):", num_threads)
+
+
+        # GPT4All-Modell laden
 model_path = r"C:\Users\nhabt\OneDrive\PycharmProjects\invoice-automation\Phi-3-mini-4k-instruct-q4.gguf"
-ki = GPT4All(model_path)
+ki = GPT4All(model_path, n_threads= num_threads-1)
 
 
         # UID-Handling
@@ -120,7 +125,7 @@ def extract_invoice_data_ki(text):
        Gesamtsumme: <Zahl mit 2 Nachkommastellen, Punkt als Dezimaltrennzeichen>
 
        Text:
-       {text[:4000]}
+       {text[:1500]}
     """
     antwort = ki.generate(prompt=prompt, max_tokens=300, temp=0.1, streaming=False)
     print("Antwort der KI:\n", antwort)
