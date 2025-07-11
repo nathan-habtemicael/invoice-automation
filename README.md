@@ -10,7 +10,7 @@ It connects to the user's email, downloads new invoices, extracts important info
 This automation saves time, reduces errors, and provides a convenient overview of invoices, which is particularly useful for managing subscription payments or business expenses.
 
 
-# Technologies Used:
+# Technologies Used
 - Python 3.10 or higher
 - IMAP protocol for email processing
 - PDF-Plumber for text extraction from PDF files
