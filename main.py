@@ -8,6 +8,10 @@ from openpyxl.styles import Font
 from datetime import datetime
 from openpyxl.styles import Font, PatternFill, Border, Side
 from gpt4all import GPT4All
+from dotenv import load_dotenv
+
+        # Zugangsdaten aus .env laden
+load_dotenv()
 
         # Anzahl logischer Kerne herausfinden
 num_threads = os.cpu_count()
@@ -185,8 +189,10 @@ def process_attachment(part, save_dir="anhänge"):
 
         # Hauptprogramm
 server = "imap.gmail.com"
-email_user = "test.max.mustermann01@gmail.com"
-email_pass = "hxaj odpb fauv znmd"
+email_user = os.getenv("EMAIL_USER")
+email_pass = os.getenv("EMAIL_PASS")
+if not email_user or not email_pass:
+    raise RuntimeError("EMAIL_USER und EMAIL_PASS müssen in der .env gesetzt sein")
 email_format = 'RFC822'
 criteria = [{"FROM": "nhabtemicael@gmail.com"}, {"FROM": "service@paypal.de"}]
 save_dir = "anhänge"
@@ -231,3 +237,4 @@ else:
 speichere_uid_max(uid_max)
 mail.logout()
 print("Verbindung geschlossen")
+

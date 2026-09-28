@@ -1,0 +1,7 @@
+.env
+.venv/
+*.gguf
+.idea/shelf/
+anhänge/
+Invoices.xlsx
+uid_max.txt
