@@ -1,5 +1,7 @@
 import imaplib
 import email
+import json
+import logging
 import pdfplumber
 import os
 import re
@@ -7,20 +9,23 @@ import openpyxl
 from openpyxl.styles import Font
 from datetime import datetime
 from openpyxl.styles import Font, PatternFill, Border, Side
-from gpt4all import GPT4All
+from groq import Groq
 from dotenv import load_dotenv
+
+        # Logging mit Zeitstempel
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
         # Zugangsdaten aus .env laden
 load_dotenv()
 
-        # Anzahl logischer Kerne herausfinden
-num_threads = os.cpu_count()
-print("Logische Kerne (inkl. Hyperthreading):", num_threads)
+        # Groq-Client initialisieren
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise RuntimeError("GROQ_API_KEY muss in der .env gesetzt sein")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+groq_client = Groq(api_key=GROQ_API_KEY)
 
-
-        # GPT4All-Modell laden
-model_path = r"C:\Users\nhabt\OneDrive\PycharmProjects\invoice-automation\Phi-3-mini-4k-instruct-q4.gguf"
-ki = GPT4All(model_path, n_threads= num_threads-1)
+ERLAUBTE_ENDUNGEN = (".pdf", ".txt", ".html")
 
 
         # UID-Handling
@@ -28,7 +33,7 @@ def lade_uid_max(dateiname="uid_max.txt"):
     try:
         with open(dateiname, "r") as f:
             return int(f.read().strip())        #strip() entfernt lehrzeichenartige Zeichen vor und nach dem String
-    except:
+    except (FileNotFoundError, ValueError):
         return 0
 
 
@@ -114,76 +119,133 @@ def create_excel_table(alle_rechnungen, excel_file="Invoices.xlsx"):
             )
 
     wb.save(excel_file)
-    print(f"Excel-Datei '{excel_file}' wurde aktualisiert.")
+    logging.info(f"Excel-Datei '{excel_file}' wurde aktualisiert.")
 
         # Daten extrahieren
-def extract_invoice_data_ki(text):
-    prompt = f"""
-       Extrahiere die folgenden Rechnungsdaten aus dem Text im EXAKT angegebenen Format. Gib NUR die Daten aus, ohne jegliche zusätzliche Erklärungen, Beispiele, Überschriften oder Kommentare. Wenn ein Wert nicht gefunden wird, lasse das Feld leer.
+SYSTEM_PROMPT = """Du extrahierst Rechnungsdaten aus Text. Antworte ausschließlich mit einem JSON-Objekt
+mit genau diesen Feldern, ohne Erklärungen und ohne Markdown:
+{
+  "datum": "TT.MM.JJJJ" oder null,
+  "rechnungsnummer": string oder null,
+  "firma": string oder null,
+  "zwischensumme": Zahl oder null,
+  "gesamtsumme": Zahl oder null
+}
+Beträge als Zahl mit Punkt als Dezimaltrennzeichen, ohne Währungssymbol.
+Erfinde keine Werte: Steht ein Wert nicht im Text, setze null."""
 
-       Format:
-       Datum: TT.MM.JJJJ
-       Rechnungsnummer: <Zeichenkette ohne Leerzeichen>
-       Firma: <Zeichenkette>
-       Zwischensumme: <Zahl mit 2 Nachkommastellen, Punkt als Dezimaltrennzeichen>
-       Gesamtsumme: <Zahl mit 2 Nachkommastellen, Punkt als Dezimaltrennzeichen>
 
-       Text:
-       {text[:1500]}
-    """
-    antwort = ki.generate(prompt=prompt, max_tokens=300, temp=0.1, streaming=False)
-    print("Antwort der KI:\n", antwort)
-
-    try:
-        return {
-            "Datum": datetime.strptime(re.search(r"Datum:\s*(\d{2}\.\d{2}\.\d{4})", antwort).group(1),
-                                       "%d.%m.%Y") if "Datum:" in antwort else None,
-            "Rechnungsnummer": re.search(r"Rechnungsnummer:\s*(\S+)", antwort).group(
-                1) if "Rechnungsnummer:" in antwort else "",
-            "Firma": re.search(r"Firma:\s*(.+)", antwort).group(1).strip() if "Firma:" in antwort else "",
-            "Zwischensumme": float(
-                re.search(r"Zwischensumme:\s*([\d\.]+)", antwort).group(1)) if "Zwischensumme:" in antwort else 0.0,
-            "Gesamtbetrag": float(
-                re.search(r"Gesamtsumme:\s*([\d\.]+)", antwort).group(1)) if "Gesamtsumme:" in antwort else 0.0
-        }
-    except Exception as e:
-        print("Fehler beim Parsen der KI-Antwort:", e)
+def parse_datum(wert):
+    if not wert:
         return None
+    try:
+        return datetime.strptime(str(wert).strip(), "%d.%m.%Y")
+    except ValueError:
+        logging.warning(f"Ungültiges Datum von der KI: {wert!r}")
+        return None
+
+
+def parse_betrag(wert):
+    if wert is None:
+        return 0.0
+    if isinstance(wert, (int, float)) and not isinstance(wert, bool):
+        return float(wert)
+    try:
+        text = re.sub(r"[^\d,.\-]", "", str(wert))
+        if "," in text and "." in text:
+            # Das zuletzt vorkommende Zeichen ist das Dezimaltrennzeichen
+            if text.rfind(",") > text.rfind("."):
+                text = text.replace(".", "").replace(",", ".")
+            else:
+                text = text.replace(",", "")
+        else:
+            text = text.replace(",", ".")
+        return float(text)
+    except ValueError:
+        logging.warning(f"Ungültiger Betrag von der KI: {wert!r}")
+        return 0.0
+
+
+def extract_invoice_data_ki(text):
+    try:
+        antwort = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            temperature=0.1,
+            max_tokens=1000,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"Rechnungstext:\n{text[:6000]}"},
+            ],
+        )
+        inhalt = antwort.choices[0].message.content
+        logging.info(f"Antwort der KI: {inhalt}")
+        daten = json.loads(inhalt)
+    except json.JSONDecodeError as e:
+        logging.error(f"KI-Antwort ist kein gültiges JSON: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"Fehler bei der Groq-Anfrage: {e}")
+        return None
+
+    if not isinstance(daten, dict):
+        logging.error(f"KI-Antwort ist kein JSON-Objekt: {daten!r}")
+        return None
+
+    return {
+        "Datum": parse_datum(daten.get("datum")),
+        "Rechnungsnummer": str(daten.get("rechnungsnummer") or ""),
+        "Firma": str(daten.get("firma") or ""),
+        "Zwischensumme": parse_betrag(daten.get("zwischensumme")),
+        "Gesamtbetrag": parse_betrag(daten.get("gesamtsumme")),
+    }
+
+
+        # Dateinamen aus E-Mails bereinigen (Schutz vor Path-Traversal)
+def sichere_dateiname(name):
+    name = os.path.basename(name.replace("\\", "/"))
+    name = re.sub(r"[^A-Za-z0-9ÄÖÜäöüß._\- ]", "_", name).strip()
+    if name in ("", ".", ".."):
+        return None
+    return name
 
 
         # Anhang verarbeiten
 def process_attachment(part, save_dir="anhänge"):
-    dateiname = part.get_filename() or f"anhang_{id(part)}.bin"
+    original = part.get_filename()
+    dateiname = sichere_dateiname(original) if original else None
+    if not dateiname or not dateiname.lower().endswith(ERLAUBTE_ENDUNGEN):
+        logging.info(f"Anhang ignoriert (nicht erlaubter Dateiname/Typ): {original!r}")
+        return None
+
     os.makedirs(save_dir, exist_ok=True)
     filepath = os.path.join(save_dir, dateiname)
 
     with open(filepath, 'wb') as f:
         f.write(part.get_payload(decode=True))
-    print(f"Anhang {dateiname} gespeichert")
+    logging.info(f"Anhang {dateiname} gespeichert")
 
     try:
         text = ''
-        if dateiname.endswith('.pdf'):
+        endung = dateiname.lower()
+        if endung.endswith('.pdf'):
             with pdfplumber.open(filepath) as pdf:
                 text = ''.join(page.extract_text() or '' for page in pdf.pages)
-        elif dateiname.endswith('.txt'):
+        elif endung.endswith('.txt'):
             with open(filepath, 'r', encoding='utf-8') as f:
                 text = f.read()
-        elif dateiname.endswith('.html'):
+        elif endung.endswith('.html'):
             with open(filepath, 'r', encoding='utf-8') as f:
                 text = re.sub(r'<[^>]+>', '', f.read()).strip()
-        else:
-            print(f"Unbekanntes Format: {dateiname}")
-            return None
 
         rechnung = extract_invoice_data_ki(text)
         if rechnung:
             alle_rechnungen.append(rechnung)
-            print(f"Rechnungsdaten extrahiert: {rechnung}")
+            logging.info(f"Rechnungsdaten extrahiert: {rechnung}")
         return rechnung
 
     except Exception as e:
-        print(f"Fehler beim Verarbeiten von {dateiname}: {e}")
+        logging.error(f"Fehler beim Verarbeiten von {dateiname}: {e}")
         return None
 
 
@@ -191,18 +253,20 @@ def process_attachment(part, save_dir="anhänge"):
 server = "imap.gmail.com"
 email_user = os.getenv("EMAIL_USER")
 email_pass = os.getenv("EMAIL_PASS")
-if not email_user or not email_pass:
-    raise RuntimeError("EMAIL_USER und EMAIL_PASS müssen in der .env gesetzt sein")
+sender_email = os.getenv("SENDER_EMAIL")
+if not email_user or not email_pass or not sender_email:
+    raise RuntimeError("EMAIL_USER, EMAIL_PASS und SENDER_EMAIL müssen in der .env gesetzt sein")
 email_format = 'RFC822'
-criteria = [{"FROM": "nhabtemicael@gmail.com"}, {"FROM": "service@paypal.de"}]
+criteria = [{"FROM": sender_email}, {"FROM": "service@paypal.de"}]
 save_dir = "anhänge"
 alle_rechnungen = []
 uid_max = lade_uid_max()
+uid_max_start = uid_max
 
 mail = imaplib.IMAP4_SSL(server)
 mail.login(email_user, email_pass)
 mail.select("INBOX")
-print("IMAP-Server verbunden")
+logging.info("IMAP-Server verbunden")
 
 search_str = search_email(uid_max, criteria)
 
@@ -211,11 +275,14 @@ for search in search_str:
     uid_list = data[0].decode().split() if data[0] else []
 
     if not uid_list:
-        print(f"Keine neuen E-Mails für {search}")
+        logging.info(f"Keine neuen E-Mails für {search}")
         continue
 
     for single_uid in uid_list:
         uid_int = int(single_uid)
+        # IMAP liefert bei "UID n:*" immer mindestens die höchste UID, auch wenn sie < n ist
+        if uid_int <= uid_max_start:
+            continue
         if uid_int > uid_max:
             uid_max = uid_int  # Max UID aktualisieren
 
@@ -231,10 +298,9 @@ for search in search_str:
 if alle_rechnungen:
     create_excel_table(alle_rechnungen)
 else:
-    print("Keine Rechnungen gefunden")
+    logging.info("Keine Rechnungen gefunden")
 
 # UID speichern und Verbindung schließen
 speichere_uid_max(uid_max)
 mail.logout()
-print("Verbindung geschlossen")
-
+logging.info("Verbindung geschlossen")
